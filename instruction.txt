@@ -1,0 +1,311 @@
+# Cahier des Charges - Application de Traçabilité Logistique Blockchain
+
+## 1. Introduction
+
+### 1.1 Objectif du Projet
+Développement d'une application de traçabilité logistique utilisant la technologie blockchain pour assurer la transparence et l'intégrité des données tout en respectant les normes RGPD.
+
+### 1.2 Public Cible
+- Chauffeurs-livreurs
+- Clients professionnels
+- Administrateurs système
+
+## 2. Interfaces Utilisateurs
+
+### 2.1 Application Mobile (Chauffeurs/Opérateurs)
+
+#### A. Écran de Connexion
+- Authentification sécurisée (2FA optionnel)
+- Récupération de mot de passe
+- Mode hors ligne disponible
+
+#### B. Dashboard Principal
+- Vue d'ensemble des livraisons du jour
+- Statut des livraisons en cours
+- Indicateurs de performance (KPI)
+- Alertes et notifications
+
+#### C. Scan et Mise à Jour
+- Scanner de codes QR/Barcodes
+- Lecture NFC/RFID
+- Interface de prise de photo
+- Formulaire de mise à jour statut
+- GPS auto-tracking
+
+#### D. Gestion des Livraisons
+- Liste des livraisons
+- Détails par livraison
+- Signature électronique
+- Preuve de livraison photo
+- Notes et commentaires
+
+#### E. Navigation
+- Carte interactive
+- Optimisation d'itinéraire
+- Points de livraison
+- Estimation temps d'arrivée
+
+### 2.2 Interface Web (Administrateurs/Gestionnaires)
+
+#### A. Dashboard Administration
+- Vue globale des opérations
+- Statistiques en temps réel
+- Alertes système
+- Rapports personnalisables
+
+#### B. Gestion des Utilisateurs
+- Création/modification comptes
+- Attribution des rôles
+- Gestion des permissions
+- Journal des activités
+
+#### C. Suivi des Opérations
+- Carte des livraisons en cours
+- État des véhicules
+- Performance des chauffeurs
+- Gestion des incidents
+
+#### D. Gestion des NFTs
+- Création de nouveaux NFTs
+- Suivi des transactions
+- Historique des modifications
+- Gestion des métadonnées
+
+#### E. Configuration Système
+- Paramètres généraux
+- Configuration blockchain
+- Gestion des API
+- Backup et maintenance
+
+### 2.3 Portail Client (Web)
+
+#### A. Espace Client
+- Connexion sécurisée
+- Tableau de bord personnalisé
+- Préférences utilisateur
+- Centre de notifications
+
+#### B. Suivi des Colis
+- Liste des envois actifs
+- Historique détaillé
+- Carte interactive
+- Notifications en temps réel
+
+#### C. Gestion des Livraisons
+- Modification créneaux
+- Instructions spéciales
+- Redirection colis
+- Gestion des retours
+
+#### D. Documents et Rapports
+- Factures
+- Bons de livraison
+- Preuves de livraison
+- Export de données
+
+## 3. Spécifications Techniques
+
+### 3.1 Architecture Blockchain
+- Smart Contracts Polygon
+- NFTs ERC-721
+- Stockage IPFS pour métadonnées
+- Oracles pour données externes
+
+### 3.2 Backend
+- Node.js/Express
+- Base de données PostgreSQL
+- Cache Redis
+- API RESTful
+
+### 3.3 Frontend
+- React pour web
+- React Native pour mobile
+- Material UI
+- WebSocket pour temps réel
+
+### 3.4 Sécurité et RGPD
+- Chiffrement des données
+- Gestion des consentements
+- Journalisation des accès
+- Anonymisation des données
+
+## 4. Fonctionnalités par Rôle
+
+### 4.1 Super Admin
+- Gestion complète du système
+- Configuration blockchain
+- Audit système
+- Gestion des contrats
+
+### 4.2 Admin Logistique
+- Gestion des opérations
+- Suivi des performances
+- Configuration des règles
+- Rapports avancés
+
+### 4.3 Opérateur Entrepôt
+- Réception colis
+- Création NFTs
+- Scan et validation
+- Gestion stock
+
+### 4.4 Chauffeur-Livreur
+- Scan livraisons
+- Mise à jour statuts
+- Navigation
+- Photos et signatures
+
+### 4.5 Client
+- Suivi livraisons
+- Gestion préférences
+- Accès documents
+- Support client
+
+## 5. Modules Spécifiques
+
+### 5.1 Module de Traçabilité
+```plaintext
+- Création NFT
+- Scan étapes
+- Historique complet
+- Preuve blockchain
+```
+
+### 5.2 Module de Géolocalisation
+```plaintext
+- Tracking temps réel
+- Optimisation routes
+- Zones couverture
+- Points intérêt
+```
+
+### 5.3 Module de Reporting
+```plaintext
+- KPIs personnalisés
+- Export données
+- Graphiques
+- Analyses prédictives
+```
+
+### 5.4 Module de Conformité
+- Gestion RGPD
+- Consentements
+- Anonymisation
+- Audit trail
+
+
+## 6. Exigences Non-Fonctionnelles
+
+### 6.1 Performance
+- Temps réponse < 2s
+- Disponibilité 99.9%
+- Scalabilité horizontale
+- Optimisation mobile
+
+### 6.2 Sécurité
+- Authentification forte
+- Chiffrement données
+- Protection API
+- Audit logs
+
+
+- Multi-langue
+
+### 6.4 Maintenance
+- Documentation complète
+- Tests automatisés
+- Monitoring système
+- Backup régulier
+
+stateDiagram-v2
+    [*] --> Login
+    Login --> Dashboard: Auth Admin
+    Login --> OperatorView: Auth Operator
+    
+    Dashboard --> UserManagement
+    Dashboard --> SystemConfig
+    Dashboard --> Reports
+    Dashboard --> Monitoring
+    
+    OperatorView --> PackageProcessing
+    OperatorView --> StockManagement
+    OperatorView --> DriverAssignment
+    
+    PackageProcessing --> NFTMinting
+    PackageProcessing --> StatusUpdate
+    
+    StockManagement --> Location
+    StockManagement --> Inventory
+    
+    Reports --> Analytics
+    Reports --> Audit
+    Reports --> KPIs
+
+# Solution de Traçabilité Blockchain
+## Documentation Technique et Fonctionnelle
+
+---
+
+# 1. Introduction
+
+## 1.1 Objectif du Projet
+
+Le projet vise à développer une solution complète de traçabilité logistique basée sur la blockchain, permettant de suivre et de gérer l'ensemble du cycle de vie des colis, tout en assurant la transparence, la sécurité et la conformité RGPD.
+
+### Objectifs Principaux
+- Traçabilité complète des colis via NFTs
+- Gestion sécurisée des données
+- Conformité RGPD
+- Interface intuitive pour tous les utilisateurs
+- Optimisation des processus logistiques
+
+## 1.2 Contexte
+
+Le secteur logistique fait face à plusieurs défis :
+- Besoin de transparence accrue
+- Nécessité de traçabilité fiable
+- Exigences réglementaires croissantes
+- Demande de digitalisation des processus
+- Protection des données personnelles
+
+## 1.3 Périmètre
+
+### Inclus
+- Application mobile pour chauffeurs/opérateurs
+- Interface web administrative
+- Portail client
+- Smart contracts sur Polygon
+- Système de gestion des NFTs
+- Module de géolocalisation
+- Système de notifications
+- Reporting et analytics
+
+### Exclus
+- Intégration matérielle spécifique
+- Gestion de la facturation
+- Gestion de la flotte de véhiculesrm -rf
+- Service client
+
+
+### Blockchain
+- **Réseau** : Polygon
+- **Smart Contracts** : Solidity
+- **NFT Standard** : ERC-721
+- **Stockage** : IPFS
+
+## 2.3 Architecture Blockchain
+
+### Smart Contracts
+```solidity
+contract ShipmentTracker {
+    struct Shipment {
+        uint256 id;
+        string status;
+        address owner;
+        string metadata;
+        uint256 timestamp;
+    }
+    
+    mapping(uint256 => Shipment) public shipments;
+}
+```
