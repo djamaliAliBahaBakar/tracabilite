@@ -11,6 +11,7 @@ contract ShipmentTrackerTest is Test {
     event ShipmentCreated(uint256 indexed shipmentId, string rfidTag, string metadata);
     event RFIDScanned(uint256 indexed shipmentId, string rfidTag, string location, string scanType);
     event StatusUpdated(uint256 indexed shipmentId, string status);
+    event ShipmentAlert(uint256 indexed shipmentId, string message, uint256 lastScanTime);
 
     function setUp() public {
         tracker = new ShipmentTracker();
@@ -190,7 +191,7 @@ contract ShipmentTrackerTest is Test {
         tracker.recordRFIDScan(shipmentId, "Warehouse B", "TRANSIT");
     }
 
-    function testGetShipmentDetailsForNonexistent() public {
+    function testGetShipmentDetailsForNonexistent() public view {
         uint256 nonExistentId = 999;
         (
             string memory status,
@@ -262,5 +263,140 @@ contract ShipmentTrackerTest is Test {
         (status,,,, isActive,) = tracker.getShipmentDetails(shipmentId);
         assertEq(status, "RETURNED", "Final status should be RETURNED");
         assertFalse(isActive, "Should be inactive after complete return");
+    }
+
+    // Ajoutez ces tests à votre fichier ShipmentTrackerTest.t.sol
+
+    function testSetAlertThreshold() public {
+        // Test de la valeur par défaut (24 heures)
+        assertEq(tracker.alertThreshold(), 24 hours, "Default threshold should be 24 hours");
+
+        // Test de la modification du seuil
+        tracker.setAlertThreshold(48);
+        assertEq(tracker.alertThreshold(), 48 hours, "Threshold should be updated to 48 hours");
+
+        // Test de la restriction onlyOwner
+        vm.prank(UNAUTHORIZED_USER);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", UNAUTHORIZED_USER));
+        tracker.setAlertThreshold(12);
+    }
+
+
+    function testInvalidAlertThreshold() public {
+        // Test that zero is rejected
+        vm.expectRevert(bytes("Alert threshold must be greater than 0"));
+        tracker.setAlertThreshold(0);
+    }
+
+  function testSetAlertThresholdValidation() public {
+        // Test initial value
+        assertEq(tracker.alertThreshold(), 24 hours, "Initial threshold should be 24 hours");
+        
+        // Test minimum valid value
+        tracker.setAlertThreshold(1);
+        assertEq(tracker.alertThreshold(), 1 hours, "Should accept minimum threshold of 1 hour");
+        
+        // Test medium value
+        tracker.setAlertThreshold(48);
+        assertEq(tracker.alertThreshold(), 48 hours, "Should accept 48 hours threshold");
+        
+        // Test large value
+        tracker.setAlertThreshold(168);  // 1 week
+        assertEq(tracker.alertThreshold(), 168 hours, "Should accept weekly threshold");
+
+        // Verify only owner can set threshold
+        vm.prank(UNAUTHORIZED_USER);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", UNAUTHORIZED_USER));
+        tracker.setAlertThreshold(12);
+    }
+
+    function testCheckShipmentAlert() public {
+        uint256 shipmentId = tracker.createShipment(
+            "Test Shipment",
+            "RFID123456789",
+            "Warehouse A"
+        );
+
+        // Initial check - shouldn't trigger alert
+        (bool needsAlert, uint256 time) = tracker.checkShipmentAlert(shipmentId);
+        assertFalse(needsAlert, "New shipment shouldn't trigger alert");
+        assertLt(time, tracker.alertThreshold(), "Time since last scan should be less than threshold");
+
+        // Avancer le temps de 25 heures
+        vm.warp(block.timestamp + 25 hours);
+
+        // Vérifier que l'alerte est déclenchée
+        (needsAlert, time) = tracker.checkShipmentAlert(shipmentId);
+        assertTrue(needsAlert, "Should trigger alert after 25 hours");
+        assertGt(time, tracker.alertThreshold(), "Time since last scan should exceed threshold");
+    }
+
+    function testAlertEmissionOnScan() public {
+        uint256 shipmentId = tracker.createShipment(
+            "Test Shipment",
+            "RFID123456789",
+            "Warehouse A"
+        );
+
+        // Avancer le temps de 25 heures
+        vm.warp(block.timestamp + 25 hours);
+
+        // S'attendre à l'émission d'une alerte lors du prochain scan
+        vm.expectEmit(true, false, false, true);
+        emit ShipmentAlert(shipmentId, "Shipment stationary for 25 hours", block.timestamp - 25 hours);
+
+        // Effectuer un nouveau scan
+        tracker.recordRFIDScan(shipmentId, "Warehouse B", "TRANSIT");
+
+        // Vérifier que l'alerte est réinitialisée
+        (bool needsAlert,) = tracker.checkShipmentAlert(shipmentId);
+        assertFalse(needsAlert, "Alert should be reset after scan");
+    }
+
+    function testNoAlertForInactiveShipment() public {
+        uint256 shipmentId = tracker.createShipment(
+            "Test Shipment",
+            "RFID123456789",
+            "Warehouse A"
+        );
+
+        // Marquer l'envoi comme retourné (inactif)
+        tracker.updateStatus(shipmentId, "RETURNED");
+
+        // Avancer le temps
+        vm.warp(block.timestamp + 25 hours);
+
+        // Vérifier qu'aucune alerte n'est déclenchée pour un envoi inactif
+        (bool needsAlert, uint256 time) = tracker.checkShipmentAlert(shipmentId);
+        assertFalse(needsAlert, "Inactive shipment shouldn't trigger alert");
+        assertEq(time, 0, "Time should be 0 for inactive shipment");
+    }
+
+    function testAlertThresholdAdjustment() public {
+        uint256 shipmentId = tracker.createShipment(
+            "Test Shipment",
+            "RFID123456789",
+            "Warehouse A"
+        );
+
+        // Définir un nouveau seuil de 12 heures
+        tracker.setAlertThreshold(12);
+
+        // Avancer le temps de 13 heures
+        vm.warp(block.timestamp + 13 hours);
+
+        // Vérifier que l'alerte est déclenchée avec le nouveau seuil
+        (bool needsAlert,) = tracker.checkShipmentAlert(shipmentId);
+        assertTrue(needsAlert, "Should trigger alert after 13 hours with 12-hour threshold");
+
+        // Effectuer un scan pour réinitialiser le timer
+        tracker.recordRFIDScan(shipmentId, "Warehouse B", "TRANSIT");
+
+        // Avancer le temps de 11 heures
+        vm.warp(block.timestamp + 11 hours);
+
+        // Vérifier qu'aucune alerte n'est déclenchée avant le seuil
+        (needsAlert,) = tracker.checkShipmentAlert(shipmentId);
+        assertFalse(needsAlert, "Should not trigger alert before threshold");
     }
 }

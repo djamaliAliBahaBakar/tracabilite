@@ -29,6 +29,8 @@ contract ShipmentTracker is ERC721, Ownable {
     mapping(uint256 => RFIDScan[]) private scans;
     uint256 private _nextShipmentId;
     
+    // Nouvelle variable pour la durée d'alerte configurable (en secondes)
+    uint256 public alertThreshold;
 
     string[] private validStatuses = [
         "CREATED", 
@@ -41,8 +43,32 @@ contract ShipmentTracker is ERC721, Ownable {
     event ShipmentCreated(uint256 indexed shipmentId, string rfidTag, string metadata);
     event RFIDScanned(uint256 indexed shipmentId, string rfidTag, string location, string scanType);
     event StatusUpdated(uint256 indexed shipmentId, string status);
+    // Nouvel événement pour les alertes
+    event ShipmentAlert(uint256 indexed shipmentId, string message, uint256 lastScanTime);
 
-    constructor() ERC721("ShipmentTracker", "SHIP") Ownable(msg.sender) {}
+
+    constructor() ERC721("ShipmentTracker", "SHIP") Ownable(msg.sender) {
+        alertThreshold = 24 hours; // Valeur par défaut : 24 heures
+    }
+
+
+   function setAlertThreshold(uint256 _hours) public onlyOwner {
+        require(_hours > 0, "Alert threshold must be greater than 0");
+        alertThreshold = _hours * 1 hours;
+    }
+
+    // Nouvelle fonction pour vérifier si un colis nécessite une alerte
+    function checkShipmentAlert(uint256 _shipmentId) public view returns (bool, uint256) {
+        require(shipmentExists(_shipmentId), "Shipment does not exist");
+        Shipment storage shipment = shipments[_shipmentId];
+        
+        if (!shipment.isActive) {
+            return (false, 0);
+        }
+
+        uint256 timeSinceLastScan = block.timestamp - shipment.timestamp;
+        return (timeSinceLastScan >= alertThreshold, timeSinceLastScan);
+    }
 
     function createShipment(
         string memory _metadata,
@@ -83,6 +109,16 @@ contract ShipmentTracker is ERC721, Ownable {
         Shipment storage shipment = shipments[_shipmentId];
         require(shipment.isActive, "Shipment is not active");
 
+        // Vérifier s'il y a une alerte avant la mise à jour
+        (bool needsAlert, uint256 timeSinceLastScan) = checkShipmentAlert(_shipmentId);
+        if (needsAlert) {
+            emit ShipmentAlert(
+                _shipmentId,
+                string.concat("Shipment stationary for ", _toString(timeSinceLastScan / 1 hours), " hours"),
+                shipment.timestamp
+            );
+        }
+
         RFIDScan memory newScan = RFIDScan({
             rfidTag: shipment.rfidTag,
             location: _location,
@@ -93,10 +129,31 @@ contract ShipmentTracker is ERC721, Ownable {
 
         scans[_shipmentId].push(newScan);
         shipment.currentLocation = _location;
+        shipment.timestamp = block.timestamp;
 
         emit RFIDScanned(_shipmentId, shipment.rfidTag, _location, _scanType);
     }
 
+    // Fonction utilitaire pour convertir uint en string
+    function _toString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+    
     function updateStatus(uint256 _shipmentId, string memory _newStatus) public onlyOwner {
         require(shipmentExists(_shipmentId), "Shipment does not exist");
         require(isValidStatus(_newStatus), "Invalid status");
