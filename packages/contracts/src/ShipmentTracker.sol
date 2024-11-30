@@ -29,7 +29,14 @@ contract ShipmentTracker is ERC721, Ownable {
     mapping(uint256 => RFIDScan[]) private scans;
     uint256 private _nextShipmentId;
     
-    string[] private validStatuses = ["CREATED", "IN_TRANSIT", "DELIVERED", "RETURNED"];
+
+    string[] private validStatuses = [
+        "CREATED", 
+        "IN_TRANSIT", 
+        "DELIVERED", 
+        "RETURNED",
+        "RETURN_IN_PROGRESS"  // Ajout du nouveau statut
+    ];
     
     event ShipmentCreated(uint256 indexed shipmentId, string rfidTag, string metadata);
     event RFIDScanned(uint256 indexed shipmentId, string rfidTag, string location, string scanType);

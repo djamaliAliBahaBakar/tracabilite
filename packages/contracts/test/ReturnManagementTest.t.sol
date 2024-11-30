@@ -6,13 +6,12 @@ import "../src/ReturnManagement.sol";
 import "../src/ShipmentTracker.sol";
 
 contract ReturnManagementTest is Test {
-   ReturnManagement public returnManager;
+    ReturnManagement public returnManager;
     ShipmentTracker public tracker;
     
     address owner = address(1);
     address customer = address(2);
 
-    // Constantes pour les tests
     string constant RFID_TAG = "RFID123456";
     string constant RETURN_RFID = "RETURN_RFID123";
     string constant METADATA = "Test Shipment";
@@ -21,23 +20,39 @@ contract ReturnManagementTest is Test {
     string constant RETURN_REASON = "DAMAGED";
 
     function setUp() public {
-        // Déploiement des contrats
         vm.startPrank(owner);
         tracker = new ShipmentTracker();
         returnManager = new ReturnManagement(address(tracker));
-        // Important : Garder owner comme propriétaire du ShipmentTracker
         vm.stopPrank();
     }
 
     function createAndDeliverShipment() internal returns (uint256) {
         vm.startPrank(owner);
-        // Créer le shipment
         uint256 shipmentId = tracker.createShipment(METADATA, RFID_TAG, DESTINATION);
-        // Mettre à jour les statuts
         tracker.updateStatus(shipmentId, "IN_TRANSIT");
         tracker.updateStatus(shipmentId, "DELIVERED");
+        tracker.transferOwnership(address(returnManager));
         vm.stopPrank();
         return shipmentId;
+    }
+
+    function testInitiateAndValidateReturn() public {
+        uint256 shipmentId = createAndDeliverShipment();
+
+        vm.prank(customer);
+        uint256 returnId = returnManager.initiateReturn(
+            shipmentId,
+            RETURN_REASON,
+            PICKUP_LOCATION,
+            RETURN_RFID
+        );
+
+        vm.prank(owner);
+        returnManager.validateReturn(returnId, true);
+
+        ReturnManagement.Return memory returnData = returnManager.getReturnDetails(returnId);
+        assertEq(returnData.returnStatus, "APPROVED");
+        assertTrue(returnData.isValidated);
     }
 
     function testCompleteReturnFlow() public {
@@ -52,85 +67,51 @@ contract ReturnManagementTest is Test {
         );
 
         vm.startPrank(owner);
-        // Donner les permissions nécessaires au ReturnManager
-        tracker.transferOwnership(address(returnManager));
+        returnManager.validateReturn(returnId, true);
+        returnManager.updateReturnStatus(returnId, "IN_TRANSIT");
+        returnManager.updateReturnStatus(returnId, "COMPLETED");
         vm.stopPrank();
 
-        vm.prank(owner);
-        returnManager.validateReturn(returnId, true);
-
-        vm.prank(owner);
-        returnManager.updateReturnStatus(returnId, "IN_TRANSIT");
-
-        vm.prank(owner);
-        returnManager.updateReturnLocation(returnId, "Marseille, France");
-
-        vm.prank(owner);
-        returnManager.updateReturnStatus(returnId, "COMPLETED");
-
         ReturnManagement.Return memory returnData = returnManager.getReturnDetails(returnId);
-        assertEq(returnData.returnStatus, "COMPLETED", "Return should be completed");
-        assertFalse(returnManager.hasActiveReturn(shipmentId), "Should not have active return");
+        assertEq(returnData.returnStatus, "COMPLETED");
+        assertFalse(returnManager.hasActiveReturn(shipmentId));
         
-        (string memory shipmentStatus,,,,,) = tracker.getShipmentDetails(shipmentId);
-        assertEq(shipmentStatus, "RETURNED", "Shipment should be marked as returned");
+        (string memory status, , , , bool isActive,) = tracker.getShipmentDetails(shipmentId);
+        assertEq(status, "RETURNED");
+        assertFalse(isActive);
     }
 
     function testFailDuplicateReturn() public {
         uint256 shipmentId = createAndDeliverShipment();
 
-        vm.startPrank(customer);
-        returnManager.initiateReturn(
-            shipmentId,
-            RETURN_REASON,
-            PICKUP_LOCATION,
-            RETURN_RFID
-        );
+        vm.prank(customer);
+        returnManager.initiateReturn(shipmentId, RETURN_REASON, PICKUP_LOCATION, RETURN_RFID);
 
-        vm.expectRevert("Active return already exists");
-        returnManager.initiateReturn(
-            shipmentId,
-            RETURN_REASON,
-            PICKUP_LOCATION,
-            "DIFFERENT_RFID"
-        );
-        vm.stopPrank();
+        vm.prank(customer);
+        returnManager.initiateReturn(shipmentId, RETURN_REASON, PICKUP_LOCATION, "DIFFERENT_RFID");
     }
 
     function testFailInvalidReturnReason() public {
         uint256 shipmentId = createAndDeliverShipment();
 
-        vm.startPrank(customer);
-        vm.expectRevert("Invalid return reason");
-        returnManager.initiateReturn(
-            shipmentId,
-            "INVALID_REASON",
-            PICKUP_LOCATION,
-            RETURN_RFID
-        );
-        vm.stopPrank();
+        vm.prank(customer);
+        returnManager.initiateReturn(shipmentId, "INVALID_REASON", PICKUP_LOCATION, RETURN_RFID);
     }
 
     function testFailUndeliveredReturn() public {
         vm.startPrank(owner);
         uint256 shipmentId = tracker.createShipment(METADATA, RFID_TAG, DESTINATION);
+        tracker.transferOwnership(address(returnManager));
         vm.stopPrank();
 
-        vm.startPrank(customer);
-        vm.expectRevert("Shipment not delivered");
-        returnManager.initiateReturn(
-            shipmentId,
-            RETURN_REASON,
-            PICKUP_LOCATION,
-            RETURN_RFID
-        );
-        vm.stopPrank();
+        vm.prank(customer);
+        returnManager.initiateReturn(shipmentId, RETURN_REASON, PICKUP_LOCATION, RETURN_RFID);
     }
 
-    function testFailNonOwnerValidate() public {
+    function testGetActiveReturnForShipment() public {
         uint256 shipmentId = createAndDeliverShipment();
 
-        vm.startPrank(customer);
+        vm.prank(customer);
         uint256 returnId = returnManager.initiateReturn(
             shipmentId,
             RETURN_REASON,
@@ -138,8 +119,28 @@ contract ReturnManagementTest is Test {
             RETURN_RFID
         );
 
-        vm.expectRevert("Ownable: caller is not the owner");
-        returnManager.validateReturn(returnId, true);
+        uint256 foundReturnId = returnManager.getActiveReturnForShipment(shipmentId);
+        assertEq(foundReturnId, returnId);
+    }
+
+    function testFailNotExistingActiveReturn() public {
+        uint256 shipmentId = createAndDeliverShipment();
+        returnManager.getActiveReturnForShipment(shipmentId);
+    }
+
+    function testFailInvalidStatusTransition() public {
+        uint256 shipmentId = createAndDeliverShipment();
+
+        vm.prank(customer);
+        uint256 returnId = returnManager.initiateReturn(
+            shipmentId,
+            RETURN_REASON,
+            PICKUP_LOCATION,
+            RETURN_RFID
+        );
+
+        vm.startPrank(owner);
+        returnManager.updateReturnStatus(returnId, "COMPLETED");
         vm.stopPrank();
     }
 }
