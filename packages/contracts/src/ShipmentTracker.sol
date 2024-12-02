@@ -25,7 +25,7 @@ contract ShipmentTracker is ERC721, Ownable {
     }
     
     mapping(uint256 => Shipment) public shipments;
-    mapping(string => bool) private usedRFIDs;
+    mapping(string => bool) private usedRFIDs; // RFID tag => bool
     mapping(uint256 => RFIDScan[]) private scans;
     uint256 private _nextShipmentId;
     
@@ -37,7 +37,7 @@ contract ShipmentTracker is ERC721, Ownable {
         "IN_TRANSIT", 
         "DELIVERED", 
         "RETURNED",
-        "RETURN_IN_PROGRESS"  // Ajout du nouveau statut
+        "RETURN_IN_PROGRESS"  
     ];
     
     event ShipmentCreated(uint256 indexed shipmentId, string rfidTag, string metadata);
@@ -46,18 +46,32 @@ contract ShipmentTracker is ERC721, Ownable {
     // Nouvel événement pour les alertes
     event ShipmentAlert(uint256 indexed shipmentId, string message, uint256 lastScanTime);
 
-
+    /**
+     * @notice Constructeur du contrat
+     * @dev Initialise le seuil d'alerte et le propriétaire du contrat
+     * 
+     */
     constructor() ERC721("ShipmentTracker", "SHIP") Ownable(msg.sender) {
+        // TODO: Tenir compte des jours ouvrés et des arretes prefectoraux
         alertThreshold = 24 hours; // Valeur par défaut : 24 heures
     }
 
-
+    /**
+     * 
+     * @param _hours : initialise le seuil d'alerte en heures
+     * @dev Le seuil d'alerte doit être compris entre 0 et 24 heures
+     */
    function setAlertThreshold(uint256 _hours) public onlyOwner {
-        require(_hours > 0, "Alert threshold must be greater than 0");
+        require(_hours > 0 && _hours <= 24, "Alert threshold must be greater than 0 and less than 24 hours");
         alertThreshold = _hours * 1 hours;
     }
 
-    // Nouvelle fonction pour vérifier si un colis nécessite une alerte
+    /**
+     * @notice Vérifie si un colis nécessite une alerte
+     * @param _shipmentId : id du colis
+     * @return bool : true si le colis nécessite une alerte, false sinon
+     * @return uint256 : temps écoulé depuis le dernier scan
+     */
     function checkShipmentAlert(uint256 _shipmentId) public view returns (bool, uint256) {
         require(shipmentExists(_shipmentId), "Shipment does not exist");
         Shipment storage shipment = shipments[_shipmentId];
@@ -70,6 +84,13 @@ contract ShipmentTracker is ERC721, Ownable {
         return (timeSinceLastScan >= alertThreshold, timeSinceLastScan);
     }
 
+    /**
+     * @notice Crée la NFT et l'associe au tag RFID
+     * @param _metadata : métadonnées du colis (caractéristiques du colis, etc.)
+     * @param _rfidTag : tag RFID du colis
+     * @param _initialLocation : emplacement initial du colis
+     * @return uint256 : id du colis créé
+     */
     function createShipment(
         string memory _metadata,
         string memory _rfidTag,
@@ -100,7 +121,13 @@ contract ShipmentTracker is ERC721, Ownable {
         return shipmentId;
     }
 
-    function recordRFIDScan(
+    /**
+     * @notice Enregistre un scan RFID
+     * @param _shipmentId : id du colis
+     * @param _location : emplacement du colis
+     * @param _scanType : type de scan (CREATION, SCAN, etc.)
+     */
+       function recordRFIDScan(
         uint256 _shipmentId,
         string memory _location,
         string memory _scanType
@@ -134,7 +161,11 @@ contract ShipmentTracker is ERC721, Ownable {
         emit RFIDScanned(_shipmentId, shipment.rfidTag, _location, _scanType);
     }
 
-    // Fonction utilitaire pour convertir uint en string
+    /**
+     * @notice Convertit un uint256 en string
+     * @param value : valeur à convertir
+     * @return string : valeur convertie en string
+     */
     function _toString(uint256 value) internal pure returns (string memory) {
         if (value == 0) {
             return "0";
@@ -154,6 +185,11 @@ contract ShipmentTracker is ERC721, Ownable {
         return string(buffer);
     }
     
+    /**
+     * @notice Met à jour le statut du colis
+     * @param _shipmentId : id du colis
+     * @param _newStatus : nouveau statut du colis
+     */
     function updateStatus(uint256 _shipmentId, string memory _newStatus) public onlyOwner {
         require(shipmentExists(_shipmentId), "Shipment does not exist");
         require(isValidStatus(_newStatus), "Invalid status");
@@ -168,6 +204,11 @@ contract ShipmentTracker is ERC721, Ownable {
         emit StatusUpdated(_shipmentId, _newStatus);
     }
 
+    /**
+     * @notice Récupère les historiques des scans RFID d'un colis
+     * @param _shipmentId : id du colis
+     * @return RFIDScan[] : tableau des scans RFID du colis
+     */
     function getShipmentScans(uint256 _shipmentId) public view returns (RFIDScan[] memory) {
         require(shipmentExists(_shipmentId), "Shipment does not exist");
         return scans[_shipmentId];
@@ -191,10 +232,18 @@ contract ShipmentTracker is ERC721, Ownable {
         return (0, false);
     }
 
+    /**
+     * @notice Vérifie si un colis existe
+     * @param _shipmentId : id du colis
+     * @return bool : true si le colis existe, false sinon
+     */
     function shipmentExists(uint256 _shipmentId) public view returns (bool) {
         return shipments[_shipmentId].timestamp != 0;
     }
 
+    /**
+     * @notice Récupère les détails d'un colis
+     */
     function getShipmentDetails(uint256 _shipmentId) public view returns (
         string memory status,
         string memory metadata,
