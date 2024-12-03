@@ -3,6 +3,9 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+/**
+ * @title Interface du contrat ShipmentTracker
+ */
 interface IShipmentTracker {
     function updateStatus(uint256 shipmentId, string memory newStatus) external;
     function getShipmentDetails(uint256 shipmentId) external view returns (
@@ -49,12 +52,20 @@ contract ReturnManagement is Ownable {
         "UNWANTED",
         "DEFECTIVE",
         "MISSING_PARTS"
-    ];
+    ]; // Liste des raisons de retour valides
 
+    /**
+     * @notice Constructeur du contrat
+     * @param _shipmentTracker : adresse du contrat ShipmentTracker
+     */
     constructor(address _shipmentTracker) Ownable(msg.sender) {
         shipmentTracker = IShipmentTracker(_shipmentTracker);
     }
 
+    /**
+     * @notice Modificateur pour vérifier si la raison du retour est valide
+     * @param reason : raison du retour
+     */
     modifier validReturnReason(string memory reason) {
         bool isValid = false;
         for (uint i = 0; i < validReturnReasons.length; i++) {
@@ -67,11 +78,21 @@ contract ReturnManagement is Ownable {
         _;
     }
 
+    /**
+     * @notice Modificateur pour vérifier si le retour existe
+     * @param returnId : id du retour
+     */
     modifier returnExists(uint256 returnId) {
         require(returnRequests[returnId].initiatedTime != 0, "Return does not exist");
         _;
     }
 
+    /**
+     * @notice Vérifie si la transition de statut est valide
+     * @param currentStatus : statut actuel
+     * @param newStatus : nouveau statut
+     * @return bool : true si la transition est valide, false sinon
+     */
     function isValidStatusTransition(string memory currentStatus, string memory newStatus) 
         internal 
         pure 
@@ -128,6 +149,11 @@ contract ReturnManagement is Ownable {
         return returnId;
     }
 
+    /**
+     * @notice Valide un retour
+     * @param returnId : id du retour
+     * @param approved : true si le retour est approuvé, false sinon
+     */
     function validateReturn(uint256 returnId, bool approved) 
         public 
         onlyOwner 

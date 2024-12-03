@@ -1,17 +1,13 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import AuthGuard from './components/auth/AuthGuard';
-import WalletConnect from './components/auth/WalletConnect';
-import Dashboard from './components/dashboard/Dashboard';
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
+import AppRoutes from './AppRoutes';
 
-export default function App() {
+function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<WalletConnect />} />
-        <Route element={<AuthGuard />}>
-          <Route path="/" element={<Dashboard />} />
-        </Route>
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   );
 }
+
+export default App;
