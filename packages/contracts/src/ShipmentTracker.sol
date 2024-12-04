@@ -62,7 +62,7 @@ contract ShipmentTracker is ERC721, Ownable {
      * @dev Le seuil d'alerte doit être compris entre 0 et 24 heures
      */
    function setAlertThreshold(uint256 _hours) public onlyOwner {
-        require(_hours > 0 && _hours <= 24, "Alert threshold must be greater than 0 and less than 24 hours");
+        require(_hours > 0, "Alert threshold must be greater than 0");
         alertThreshold = _hours * 1 hours;
     }
 
